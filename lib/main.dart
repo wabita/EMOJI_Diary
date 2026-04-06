@@ -345,15 +345,22 @@ class _EmojiDiaryPageState extends State<EmojiDiaryPage> {
           ),
           const SizedBox(height: 20),
 
-          if (emoji != null)
-            Text(emoji, style: const TextStyle(fontSize: 80))
-          else if (isToday)
+          if (emoji != null) ...[
+            Text(emoji, style: const TextStyle(fontSize: 80)),
+            if (isToday)
+              TextButton.icon(
+                onPressed: _showEmojiPicker,
+                icon: const Icon(Icons.edit, size: 18),
+                label: const Text('絵文字を変更する'),
+                style: TextButton.styleFrom(foregroundColor: Colors.cyan),
+              ),
+          ] else if (isToday)
             ElevatedButton(
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.cyan.withOpacity(0.5),
                 foregroundColor: Colors.white,
               ),
-              onPressed: () => _addEmoji('🥺'),
+              onPressed: () => _showEmojiPicker(),
               child: const Text('今日の思い出絵文字を入力'),
             )
           else if (isPast)
@@ -382,5 +389,74 @@ class _EmojiDiaryPageState extends State<EmojiDiaryPage> {
       );
       _diaryEntries[key] = emoji;
     });
+  }
+
+  // --- 絵文字選択シートを表示する関数 ---
+  void _showEmojiPicker() {
+    // 選択肢となる絵文字リスト
+    final List<String> emojis = [
+      '😊',
+      '🥺',
+      '😴',
+      '🐱',
+      '🍕',
+      '🎉',
+      '💻',
+      '🔥',
+      '✨',
+      '🌈',
+      '🍀',
+      '💡',
+      '🎵',
+      '📘',
+      '🏃',
+      '💤',
+    ];
+
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return Container(
+          padding: const EdgeInsets.all(20),
+          height: 300, // シートの高さ
+          child: Column(
+            children: [
+              const Text(
+                '今日の気分は？',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+              ),
+              const SizedBox(height: 20),
+              Expanded(
+                child: GridView.builder(
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 4, // 1行に4つ並べる
+                    mainAxisSpacing: 10,
+                    crossAxisSpacing: 10,
+                  ),
+                  itemCount: emojis.length,
+                  itemBuilder: (context, index) {
+                    return InkWell(
+                      onTap: () {
+                        _addEmoji(emojis[index]); // 絵文字を登録
+                        Navigator.pop(context); // シートを閉じる
+                      },
+                      child: Center(
+                        child: Text(
+                          emojis[index],
+                          style: const TextStyle(fontSize: 40),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 }
