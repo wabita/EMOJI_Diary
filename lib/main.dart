@@ -136,66 +136,104 @@ class _EmojiDiaryPageState extends State<EmojiDiaryPage> {
                 ),
               ),
             ),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
+          Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              if (onBack == null)
-                IconButton(
-                  icon: const Icon(Icons.chevron_left),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  if (onBack == null)
+                    IconButton(
+                      icon: const Icon(Icons.chevron_left),
+                      onPressed: () {
+                        setState(() {
+                          // 1ヶ月前に移動
+                          _focusedDay = DateTime(
+                            _focusedDay.year,
+                            _focusedDay.month - 1,
+                            1,
+                          );
+                        });
+                      },
+                    ),
+                  const SizedBox(width: 8),
+
+                  // 年の選択ボタン
+                  _buildSelectableHeaderButton(
+                    label: '${_focusedDay.year} ▼',
+                    options: years,
+                    onSelected: (String value) {
+                      setState(() {
+                        _focusedDay = DateTime(
+                          int.parse(value),
+                          _focusedDay.month,
+                          1,
+                        );
+                      });
+                    },
+                  ),
+                  const Text('　/　'),
+                  // 月の選択ボタン
+                  _buildSelectableHeaderButton(
+                    label: '${months[_focusedDay.month - 1]} ▼',
+                    options: months,
+                    onSelected: (String value) {
+                      final newMonth = months.indexOf(value) + 1;
+                      setState(() {
+                        _focusedDay = DateTime(_focusedDay.year, newMonth, 1);
+                      });
+                    },
+                  ),
+                  const SizedBox(width: 8),
+
+                  if (onBack == null)
+                    IconButton(
+                      icon: const Icon(Icons.chevron_right),
+                      onPressed: () {
+                        setState(() {
+                          // 1ヶ月後に移動
+                          _focusedDay = DateTime(
+                            _focusedDay.year,
+                            _focusedDay.month + 1,
+                            1,
+                          );
+                        });
+                      },
+                    ),
+                ],
+              ),
+
+              if (onBack == null) // カレンダー表示の時だけ
+                TextButton(
+                  style: TextButton.styleFrom(
+                    side: const BorderSide(
+                      color: Color.fromARGB(255, 106, 73, 140),
+                      width: 1.5,
+                    ),
+
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 0,
+                    ),
+                    minimumSize: const Size(0, 30),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
                   onPressed: () {
                     setState(() {
-                      // 1ヶ月前に移動
-                      _focusedDay = DateTime(
-                        _focusedDay.year,
-                        _focusedDay.month - 1,
-                        1,
-                      );
+                      final now = DateTime.now();
+                      _focusedDay = now; // 表示を今月に飛ばす
+                      _selectedDay = now; // 今日を選択状態にする
                     });
                   },
-                ),
-              const SizedBox(width: 8),
+                  child: const Text(
+                    'Today',
+                    style: TextStyle(
+                      color: Color.fromARGB(255, 106, 73, 140),
 
-              // 年の選択ボタン
-              _buildSelectableHeaderButton(
-                label: '${_focusedDay.year} ▼',
-                options: years,
-                onSelected: (String value) {
-                  setState(() {
-                    _focusedDay = DateTime(
-                      int.parse(value),
-                      _focusedDay.month,
-                      1,
-                    );
-                  });
-                },
-              ),
-              const Text('　/　'),
-              // 月の選択ボタン
-              _buildSelectableHeaderButton(
-                label: '${months[_focusedDay.month - 1]} ▼',
-                options: months,
-                onSelected: (String value) {
-                  final newMonth = months.indexOf(value) + 1;
-                  setState(() {
-                    _focusedDay = DateTime(_focusedDay.year, newMonth, 1);
-                  });
-                },
-              ),
-              const SizedBox(width: 8),
-
-              if (onBack == null)
-                IconButton(
-                  icon: const Icon(Icons.chevron_right),
-                  onPressed: () {
-                    setState(() {
-                      // 1ヶ月後に移動
-                      _focusedDay = DateTime(
-                        _focusedDay.year,
-                        _focusedDay.month + 1,
-                        1,
-                      );
-                    });
-                  },
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                    ),
+                  ),
                 ),
             ],
           ),
