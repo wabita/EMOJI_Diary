@@ -1,3 +1,6 @@
+import 'dart:io' as io;
+
+import 'package:emoji_picker_flutter/emoji_picker_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:table_calendar/table_calendar.dart';
 
@@ -393,67 +396,52 @@ class _EmojiDiaryPageState extends State<EmojiDiaryPage> {
 
   // --- 絵文字選択シートを表示する関数 ---
   void _showEmojiPicker() {
-    // 選択肢となる絵文字リスト
-    final List<String> emojis = [
-      '😊',
-      '🥺',
-      '😴',
-      '🐱',
-      '🍕',
-      '🎉',
-      '💻',
-      '🔥',
-      '✨',
-      '🌈',
-      '🍀',
-      '💡',
-      '🎵',
-      '📘',
-      '🏃',
-      '💤',
-    ];
-
     showModalBottomSheet(
       context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) {
+      isScrollControlled: true,
+      builder: (BuildContext context) {
         return Container(
-          padding: const EdgeInsets.all(20),
-          height: 300, // シートの高さ
-          child: Column(
-            children: [
-              const Text(
-                '今日の気分は？',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-              ),
-              const SizedBox(height: 20),
-              Expanded(
-                child: GridView.builder(
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 4, // 1行に4つ並べる
-                    mainAxisSpacing: 10,
-                    crossAxisSpacing: 10,
+          height: MediaQuery.of(context).size.height * 0.4,
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: SafeArea(
+            bottom: true,
+            child: Column(
+              children: [
+                const SizedBox(height: 10),
+                Container(
+                  width: 40,
+                  height: 5,
+                  decoration: BoxDecoration(
+                    color: const Color.fromARGB(31, 255, 255, 255),
+                    borderRadius: BorderRadius.circular(10),
                   ),
-                  itemCount: emojis.length,
-                  itemBuilder: (context, index) {
-                    return InkWell(
-                      onTap: () {
-                        _addEmoji(emojis[index]); // 絵文字を登録
-                        Navigator.pop(context); // シートを閉じる
-                      },
-                      child: Center(
-                        child: Text(
-                          emojis[index],
-                          style: const TextStyle(fontSize: 40),
-                        ),
-                      ),
-                    );
-                  },
                 ),
-              ),
-            ],
+                Expanded(
+                  child: EmojiPicker(
+                    onEmojiSelected: (category, emoji) {
+                      _addEmoji(emoji.emoji);
+                      Navigator.pop(context);
+                    },
+                    config: Config(
+                      emojiViewConfig: EmojiViewConfig(
+                        columns: 7,
+                        emojiSizeMax: 28 * (io.Platform.isIOS ? 1.20 : 1.0),
+                      ),
+                      checkPlatformCompatibility: true,
+                      // 操作バー（青い部分）の見た目を調整したい場合はここ
+                      bottomActionBarConfig: const BottomActionBarConfig(
+                        backgroundColor: Colors.white, // 背景を白くしてスッキリさせることも可能
+                        buttonColor: Colors.transparent,
+                        buttonIconColor: Colors.black45,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         );
       },
