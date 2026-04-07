@@ -25,7 +25,8 @@ class EmojiDiaryPage extends StatefulWidget {
 }
 
 class _EmojiDiaryPageState extends State<EmojiDiaryPage> {
-  bool _isDetailView = false;
+  bool _isDetailView = false; //日付をタップしたときに詳細画面を表示するかどうか
+  bool _showDates = true; //日付を表示するかどうか
   DateTime _focusedDay = DateTime.now();
   DateTime? _selectedDay = DateTime.now();
 
@@ -40,7 +41,37 @@ class _EmojiDiaryPageState extends State<EmojiDiaryPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
-      appBar: AppBar(title: const Text('Emoji Diary'), centerTitle: true),
+      appBar: AppBar(
+        title: const Text('Emoji Diary'),
+        centerTitle: true,
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 8.0),
+            child: IconButton(
+              onPressed: () => setState(() => _showDates = !_showDates),
+              icon: Stack(
+                alignment: Alignment.center,
+                children: [
+                  Icon(
+                    _showDates ? Icons.block : Icons.radio_button_unchecked,
+                    color: _showDates ? Colors.red : Colors.green,
+                    size: 28,
+                  ),
+                  const Text(
+                    '1',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black,
+                    ),
+                  ),
+                ], //children
+              ),
+            ),
+          ),
+        ],
+      ),
+
       body: AnimatedSwitcher(
         duration: const Duration(milliseconds: 300),
         child: _isDetailView ? _buildDailyViewPage() : _buildCalendarPage(),
@@ -275,18 +306,50 @@ class _EmojiDiaryPageState extends State<EmojiDiaryPage> {
       markerBuilder: (context, date, events) {
         final emoji = _diaryEntries[DateTime(date.year, date.month, date.day)];
         if (emoji != null) {
-          return Positioned(
-            bottom: 2,
-            child: Text(emoji, style: const TextStyle(fontSize: 12)),
-          );
+          if (_showDates) {
+            return Align(
+              alignment: Alignment.bottomCenter,
+              child: Padding(
+                padding: const EdgeInsets.only(bottom: 2.0),
+                child: Text(emoji, style: const TextStyle(fontSize: 18)),
+              ),
+            );
+          } else {
+            return Center(
+              child: Text(
+                emoji,
+                style: const TextStyle(fontSize: 25), // ★ サイズを思い切って大きく（例：36）
+              ),
+            );
+          }
         }
         return null;
       },
     );
   }
 
+  //メインのカレンダー表示
   CalendarStyle _buildCalendarStyle() {
+    //今月の日付の色制御
+    final dateTextStyle = TextStyle(
+      color: _showDates ? Colors.black : Colors.transparent, // オフの時は透明に
+    );
+    //前後の月の日付制御
+    final outDateTextStyle = TextStyle(
+      // ONの時は薄いグレー(black26)、OFFの時は透明に
+      color: _showDates ? Colors.black26 : Colors.transparent,
+    );
     return CalendarStyle(
+      cellAlignment: Alignment.topCenter,
+      cellPadding: const EdgeInsets.only(top: 2),
+
+      defaultTextStyle: dateTextStyle,
+      weekendTextStyle: dateTextStyle,
+      todayTextStyle: dateTextStyle.copyWith(fontWeight: FontWeight.bold),
+      selectedTextStyle: dateTextStyle.copyWith(fontWeight: FontWeight.bold),
+
+      outsideTextStyle: outDateTextStyle, //前後の月の日付も非表示できるように
+
       todayDecoration: BoxDecoration(
         color: Colors.cyan.withOpacity(0.3),
         shape: BoxShape.rectangle,
