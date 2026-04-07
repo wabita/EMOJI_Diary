@@ -27,6 +27,9 @@ class EmojiDiaryPage extends StatefulWidget {
 class _EmojiDiaryPageState extends State<EmojiDiaryPage> {
   bool _isDetailView = false; //日付をタップしたときに詳細画面を表示するかどうか
   bool _showDates = true; //日付を表示するかどうか
+  bool _isScrollMode = false; //カレンダーの表示モード（通常の月表示 or 縦スクロール）
+  late ScrollController _scrollController;
+  final double _monthItemHeight = 360.0;
   DateTime _focusedDay = DateTime.now();
   DateTime? _selectedDay = DateTime.now();
 
@@ -38,6 +41,41 @@ class _EmojiDiaryPageState extends State<EmojiDiaryPage> {
   };
 
   @override
+  void initState() {
+    super.initState();
+    // 12ヶ月分（初期位置）にスクロールを合わせるためのコントローラー
+    _scrollController = ScrollController(
+      initialScrollOffset: 12 * _monthItemHeight,
+    );
+    _scrollController.addListener(_onScroll);
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    if (!_isScrollMode) return;
+
+    // 現在のスクロール位置から「何番目の月か」を計算
+    int index = (_scrollController.offset / _monthItemHeight).round();
+    DateTime newMonth = DateTime(
+      DateTime.now().year,
+      DateTime.now().month - 12 + index,
+    );
+
+    // 月が変わった時だけ setState してヘッダーを更新
+    if (newMonth.month != _focusedDay.month ||
+        newMonth.year != _focusedDay.year) {
+      setState(() {
+        _focusedDay = newMonth;
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
@@ -45,6 +83,13 @@ class _EmojiDiaryPageState extends State<EmojiDiaryPage> {
         title: const Text('Emoji Diary'),
         centerTitle: true,
         actions: [
+          IconButton(
+            onPressed: () => setState(() => _isScrollMode = !_isScrollMode),
+            icon: Icon(
+              _isScrollMode ? Icons.grid_view : Icons.view_headline,
+              color: Colors.cyan,
+            ),
+          ),
           Padding(
             padding: const EdgeInsets.only(right: 8.0),
             child: IconButton(
@@ -74,7 +119,11 @@ class _EmojiDiaryPageState extends State<EmojiDiaryPage> {
 
       body: AnimatedSwitcher(
         duration: const Duration(milliseconds: 300),
-        child: _isDetailView ? _buildDailyViewPage() : _buildCalendarPage(),
+        child: _isDetailView
+            ? _buildDailyViewPage()
+            : (_isScrollMode
+                  ? _buildVerticalCalendarList() //スクロールモード
+                  : _buildCalendarPage()), //横モード
       ),
     );
   }
@@ -297,6 +346,55 @@ class _EmojiDiaryPageState extends State<EmojiDiaryPage> {
         ),
         child: Text(label, style: const TextStyle(fontWeight: FontWeight.bold)),
       ),
+    );
+  }
+
+  //カレンダー縦スクロールオプション
+  Widget _buildVerticalCalendarList() {
+    return ListView.builder(
+      controller: _scrollController,
+      itemCount: 36,
+      itemExtent: _monthItemHeight,
+      itemBuilder: (context, index) {
+        // インデックスからその月のDateTimeを計算
+        // 例: 0 = 12ヶ月前, 12 = 今月, 23 = 11ヶ月後
+        final month = DateTime(
+          DateTime.now().year,
+          DateTime.now().month - 12 + index,
+        );
+
+        return Container(
+          height: _monthItemHeight,
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          child: TableCalendar(
+            firstDay: DateTime.utc(2000, 1, 1),
+            lastDay: DateTime.utc(2030, 12, 31),
+            focusedDay: month,
+            calendarFormat: CalendarFormat.month,
+            headerVisible: false,
+            daysOfWeekVisible:
+                index == 0 ||
+                _scrollController.offset >
+                    (index * _monthItemHeight), // 最初の月だけ曜日を出す等の調整も可
+            sixWeekMonthsEnforced: true, // ★ これをtrueにすると全ての月が6行になり、高さが揃う
+            availableGestures: AvailableGestures.none,
+
+            selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
+            onDaySelected: (selected, focused) {
+              if (isSameDay(_selectedDay, selected)) {
+                setState(() => _isDetailView = true);
+              } else {
+                setState(() {
+                  _selectedDay = selected;
+                  _focusedDay = focused;
+                });
+              }
+            },
+            calendarBuilders: _buildCalendarBuilders(),
+            calendarStyle: _buildCalendarStyle(),
+          ),
+        );
+      },
     );
   }
 
