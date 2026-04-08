@@ -328,7 +328,7 @@ class _CalScreenState extends State<CalScreen> {
     );
   }*/
 
-  //固定される曜日ヘッダー
+  /*/固定される曜日ヘッダー
   Widget _buildDaysOfWeekHeader() {
     final days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
     return Container(
@@ -357,7 +357,7 @@ class _CalScreenState extends State<CalScreen> {
         }).toList(),
       ),
     );
-  }
+  }*/
 
   // --- カレンダーの装飾 ---
   CalendarBuilders _buildCalendarBuilders() {
@@ -404,9 +404,7 @@ class _CalScreenState extends State<CalScreen> {
       cellAlignment: Alignment.topCenter,
       cellPadding: const EdgeInsets.only(top: 2),
 
-      defaultTextStyle: TextStyle(
-        color: widget.showDates ? Colors.black : Colors.transparent,
-      ),
+      defaultTextStyle: dateTextStyle,
       weekendTextStyle: TextStyle(
         color: widget.showDates ? Colors.red : Colors.transparent,
       ),
@@ -422,7 +420,7 @@ class _CalScreenState extends State<CalScreen> {
       outsideTextStyle: outDateTextStyle, //前後の月の日付も非表示できるように
 
       todayDecoration: BoxDecoration(
-        color: Colors.cyan.withOpacity(0.3),
+        color: Colors.cyan.withValues(alpha: 0.3),
         shape: BoxShape.rectangle,
         borderRadius: BorderRadius.circular(4),
       ),
@@ -431,6 +429,9 @@ class _CalScreenState extends State<CalScreen> {
         shape: BoxShape.rectangle,
         borderRadius: BorderRadius.circular(4),
       ),
+      weekendDecoration: const BoxDecoration(shape: BoxShape.rectangle),
+      holidayDecoration: const BoxDecoration(shape: BoxShape.rectangle),
+      defaultDecoration: const BoxDecoration(shape: BoxShape.rectangle),
       outsideDecoration: const BoxDecoration(shape: BoxShape.rectangle),
       cellMargin: const EdgeInsets.all(2),
     );
@@ -492,7 +493,7 @@ class _CalScreenState extends State<CalScreen> {
           ] else if (isToday)
             ElevatedButton(
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.cyan.withOpacity(0.5),
+                backgroundColor: Colors.cyan.withValues(alpha: 0.5),
                 foregroundColor: Colors.white,
               ),
               onPressed: () => _showEmojiPicker(),
