@@ -12,10 +12,10 @@ class CalScreen extends StatefulWidget {
   });
 
   @override
-  State<CalScreen> createState() => _CalScreenState();
+  State<CalScreen> createState() => CalScreenState();
 }
 
-class _CalScreenState extends State<CalScreen> {
+class CalScreenState extends State<CalScreen> {
   bool _isDetailView = false; //日付をタップしたときに詳細画面を表示するかどうか
 
   DateTime _focusedDay = DateTime.now();
@@ -27,6 +27,24 @@ class _CalScreenState extends State<CalScreen> {
     DateTime(2025, 9, 2): '💻',
     DateTime(2025, 9, 15): '🥺',
   };
+  // NaviRootから呼び出すための関数
+  void triggerTodayAction() {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+
+    setState(() {
+      _selectedDay = now;
+      _focusedDay = now;
+      _isDetailView = true; // 詳細画面に切り替え
+    });
+
+    // 今日の絵文字がまだ登録されていないか
+    if (!_diaryEntries.containsKey(today)) {
+      Future.delayed(const Duration(milliseconds: 300), () {
+        if (mounted) _showEmojiPicker();
+      });
+    }
+  }
 
   @override
   void initState() {

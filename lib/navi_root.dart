@@ -9,13 +9,14 @@ class NaviRoot extends StatefulWidget {
 }
 
 class _NaviRootState extends State<NaviRoot> {
+  final GlobalKey<CalScreenState> _calKey = GlobalKey();
   int _currentIndex = 0;
   bool _showDates = true;
 
   @override
   Widget build(BuildContext context) {
     final List<Widget> pages = [
-      CalScreen(showDates: _showDates),
+      CalScreen(key: _calKey, showDates: _showDates),
       const Center(child: Text('アーカイブ')),
       const Center(child: Text('タイムライン')),
       const Center(child: Text('プロフィール')),
@@ -54,11 +55,21 @@ class _NaviRootState extends State<NaviRoot> {
         ],
       ),
       body: pages[_currentIndex],
-
       // 真ん中の投稿ボタン
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
       floatingActionButton: FloatingActionButton(
-        onPressed: () {},
+        onPressed: () {
+          // もし他のタブにいたら、カレンダータブに切り替え
+          setState(() {
+            _currentIndex = 0;
+          });
+
+          // CalScreenの関数を実行する
+          // currentState が null でないことを確認して呼び出し
+          Future.microtask(() {
+            _calKey.currentState?.triggerTodayAction();
+          });
+        },
         child: const Icon(Icons.add_reaction),
       ),
 
