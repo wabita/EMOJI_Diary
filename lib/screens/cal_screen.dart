@@ -4,7 +4,13 @@ import 'package:table_calendar/table_calendar.dart';
 
 class CalScreen extends StatefulWidget {
   final bool showDates;
-  const CalScreen({super.key, required this.showDates});
+  final bool autoOpenPicker;
+  const CalScreen({
+    super.key,
+    required this.showDates,
+    this.autoOpenPicker = false, // デフォルトはfalse
+  });
+
   @override
   State<CalScreen> createState() => _CalScreenState();
 }
@@ -21,17 +27,23 @@ class _CalScreenState extends State<CalScreen> {
     DateTime(2025, 9, 2): '💻',
     DateTime(2025, 9, 15): '🥺',
   };
-  /*
+
   @override
   void initState() {
     super.initState();
-    // 12ヶ月分（初期位置）にスクロールを合わせるためのコントローラー
-    _scrollController = ScrollController(
-      initialScrollOffset: 12 * _monthItemHeight,
-    );
-    _scrollController.addListener(_onScroll);
+
+    if (widget.autoOpenPicker) {
+      // 描画が1フレーム完了した直後に実行されるコールバック
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        setState(() {
+          _isDetailView = true; // まず詳細画面に切り替える
+        });
+        _showEmojiPicker(); // その後ピッカーを出す
+      });
+    }
   }
 
+  /*
   @override
   void dispose() {
     _scrollController.dispose();
