@@ -12,7 +12,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       theme: ThemeData(useMaterial3: true, colorSchemeSeed: Colors.cyan),
-      home: const NaviRoot(), // NaviRootを最初に表示
+      home: const NaviRoot(),
     );
   }
 }

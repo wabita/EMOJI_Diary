@@ -2,13 +2,18 @@ import 'package:emoji_picker_flutter/emoji_picker_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:table_calendar/table_calendar.dart';
 
+// DateTimeの利便性を上げるための拡張
+extension DateTimeExtension on DateTime {
+  DateTime get dateOnly => DateTime(year, month, day);
+}
+
 class CalScreen extends StatefulWidget {
   final bool showDates;
   final bool autoOpenPicker;
   const CalScreen({
     super.key,
     required this.showDates,
-    this.autoOpenPicker = false, // デフォルトはfalse
+    this.autoOpenPicker = false,
   });
 
   @override
@@ -16,8 +21,7 @@ class CalScreen extends StatefulWidget {
 }
 
 class CalScreenState extends State<CalScreen> {
-  bool _isDetailView = false; //日付をタップしたときに詳細画面を表示するかどうか
-
+  bool _isDetailView = false; //日付タップで詳細画面を表示するか
   DateTime _focusedDay = DateTime.now();
   DateTime? _selectedDay = DateTime.now();
 
@@ -27,7 +31,19 @@ class CalScreenState extends State<CalScreen> {
     DateTime(2025, 9, 2): '💻',
     DateTime(2025, 9, 15): '🥺',
   };
-  // NaviRootから呼び出すための関数
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.autoOpenPicker) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        setState(() => _isDetailView = true); // 詳細画面に切り替え
+        _showEmojiPicker(); // ピッカー表示
+      });
+    }
+  }
+
+  // NaviRoot呼び出し
   void triggerTodayAction() {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
@@ -46,71 +62,45 @@ class CalScreenState extends State<CalScreen> {
     }
   }
 
-  @override
-  void initState() {
-    super.initState();
-
-    if (widget.autoOpenPicker) {
-      // 描画が1フレーム完了した直後に実行されるコールバック
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        setState(() {
-          _isDetailView = true; // まず詳細画面に切り替える
-        });
-        _showEmojiPicker(); // その後ピッカーを出す
-      });
-    }
+  void _moveDay(int days) {
+    setState(() {
+      _selectedDay = _selectedDay!.add(Duration(days: days));
+      _focusedDay = _selectedDay!;
+    });
   }
 
-  /*
-  @override
-  void dispose() {
-    _scrollController.dispose();
-    super.dispose();
+  void _addEmoji(String emoji) {
+    setState(() {
+      _diaryEntries[_selectedDay!.dateOnly] = emoji;
+    });
   }
 
-  void _onScroll() {
-    if (!_isScrollMode || !_scrollController.hasClients) return;
-
-    // 現在のスクロール位置から「何番目の月か」を計算
-    //(offset + 20) / height
-    const double approxMonthHeight = 320.0;
-    int index = ((_scrollController.offset + 200) / approxMonthHeight).floor();
-    DateTime newMonth = DateTime(
-      DateTime.now().year,
-      DateTime.now().month - 12 + index,
-    );
-
-    // 月が変わった時だけ setState してヘッダーを更新
-    if (newMonth.month != _focusedDay.month ||
-        newMonth.year != _focusedDay.year) {
-      setState(() {
-        _focusedDay = newMonth;
-      });
-    }
-  }
-    */
   @override
   Widget build(BuildContext context) {
     // 理由：外側の NaviRoot がすでにそれらを用意してくれているから
     return Column(
       children: [
-        _buildCustomHeader(
-          onBack: _isDetailView
-              ? () => setState(() => _isDetailView = false)
-              : null,
-        ),
-        //if (!_isDetailView) _buildDaysOfWeekHeader(),
+        _buildHeader(),
         Expanded(
           child: AnimatedSwitcher(
             duration: const Duration(milliseconds: 300),
-            child: _isDetailView ? _buildDailyViewPage() : _buildCalendarGrid(),
+            child: _isDetailView ? _buildDailyViewBody() : _buildCalendarGrid(),
           ),
         ),
       ],
     );
   }
 
-  // --- カレンダー画面の構築 ---
+  // ヘッダー部分
+  Widget _buildHeader() {
+    return _buildCustomHeader(
+      onBack: _isDetailView
+          ? () => setState(() => _isDetailView = false)
+          : null,
+    );
+  }
+
+  // カレンダー画面
   Widget _buildCalendarGrid() {
     return TableCalendar(
       key: const ValueKey('CalendarGrid'),
@@ -118,12 +108,17 @@ class CalScreenState extends State<CalScreen> {
       lastDay: DateTime.utc(2030, 12, 31),
       focusedDay: _focusedDay,
       headerVisible: false,
-      daysOfWeekVisible: true,
-      calendarFormat: CalendarFormat.month,
-      selectedDayPredicate: (day) {
-        return isSameDay(_selectedDay, day);
+      selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
+      onDaySelected: (selectedDay, focusedDay) {
+        setState(() {
+          if (isSameDay(_selectedDay, selectedDay)) {
+            _isDetailView = true;
+          } else {
+            _selectedDay = selectedDay;
+            _focusedDay = focusedDay;
+          }
+        });
       },
-      onDaySelected: _onDaySelected,
       rowHeight: 80.0,
       calendarBuilders: _buildCalendarBuilders(),
       calendarStyle: _buildCalendarStyle(),
@@ -131,28 +126,11 @@ class CalScreenState extends State<CalScreen> {
     );
   }
 
-  // --- 詳細画面の構築 ---
-  Widget _buildDailyViewPage() {
-    return _buildDailyViewBody();
-  }
-
   // --- ヘッダー（月・年を選択可能） ---
   Widget _buildCustomHeader({VoidCallback? onBack}) {
-    final months = [
-      ' 1 ',
-      ' 2 ',
-      ' 3 ',
-      ' 4 ',
-      ' 5 ',
-      ' 6 ',
-      ' 7 ',
-      ' 8 ',
-      ' 9 ',
-      ' 10 ',
-      ' 11 ',
-      ' 12 ',
-    ];
-    final years = List.generate(31, (index) => (2000 + index).toString());
+    final months = List.generate(12, (i) => (i + 1).toString());
+    final currentYear = DateTime.now().year;
+    final years = List.generate(21, (i) => (currentYear - 10 + i).toString());
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
@@ -162,328 +140,163 @@ class CalScreenState extends State<CalScreen> {
           if (onBack != null)
             Align(
               alignment: Alignment.centerLeft,
-              child: InkWell(
-                onTap: onBack,
-                child: const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.chevron_left, color: Colors.cyan, size: 28),
-                    Text(
-                      'Month',
-                      style: TextStyle(
-                        color: Colors.cyan,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                      ),
-                    ),
-                  ],
+              child: TextButton.icon(
+                onPressed: onBack,
+                icon: const Icon(
+                  Icons.chevron_left,
+                  color: Colors.cyan,
+                  size: 28,
+                ),
+                label: const Text(
+                  'Month',
+                  style: TextStyle(
+                    color: Colors.cyan,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
             ),
-          Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  if (onBack == null)
-                    IconButton(
-                      icon: const Icon(Icons.chevron_left),
-                      onPressed: () {
-                        setState(() {
-                          // 1ヶ月前に移動
-                          _focusedDay = DateTime(
-                            _focusedDay.year,
-                            _focusedDay.month - 1,
-                            1,
-                          );
-                        });
-                      },
-                    ),
-                  const SizedBox(width: 8),
-
-                  // 年の選択ボタン
-                  _buildSelectableHeaderButton(
-                    label: '${_focusedDay.year} ▼',
-                    options: years,
-                    onSelected: (String value) {
-                      setState(() {
-                        _focusedDay = DateTime(
-                          int.parse(value),
-                          _focusedDay.month,
-                          1,
-                        );
-                      });
-                    },
-                  ),
-                  const Text('　/　'),
-                  // 月の選択ボタン
-                  _buildSelectableHeaderButton(
-                    label: '${months[_focusedDay.month - 1]} ▼',
-                    options: months,
-                    onSelected: (String value) {
-                      final newMonth = months.indexOf(value) + 1;
-                      setState(() {
-                        _focusedDay = DateTime(_focusedDay.year, newMonth, 1);
-                      });
-                    },
-                  ),
-                  const SizedBox(width: 8),
-
-                  if (onBack == null)
-                    IconButton(
-                      icon: const Icon(Icons.chevron_right),
-                      onPressed: () {
-                        setState(() {
-                          // 1ヶ月後に移動
-                          _focusedDay = DateTime(
-                            _focusedDay.year,
-                            _focusedDay.month + 1,
-                            1,
-                          );
-                        });
-                      },
-                    ),
-                ],
-              ),
-
-              if (onBack == null) // カレンダー表示の時だけ
-                TextButton(
-                  style: TextButton.styleFrom(
-                    side: const BorderSide(
-                      color: Color.fromARGB(255, 106, 73, 140),
-                      width: 1.5,
-                    ),
-
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 0,
-                    ),
-                    minimumSize: const Size(0, 30),
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  ),
-                  onPressed: () {
-                    setState(() {
-                      final now = DateTime.now();
-                      _focusedDay = now; // 表示を今月に飛ばす
-                      _selectedDay = now; // 今日を選択状態にする
-                    });
-                  },
-                  child: const Text(
-                    'Today',
-                    style: TextStyle(
-                      color: Color.fromARGB(255, 106, 73, 140),
-
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14,
-                    ),
-                  ),
-                ),
-            ],
-          ),
+          _buildHeaderCenter(onBack == null, years, months),
         ],
       ),
     );
   }
 
-  // タップして選択できるボタンの定義
-  Widget _buildSelectableHeaderButton({
+  Widget _buildHeaderCenter(
+    bool isCalendarMode,
+    List<String> years,
+    List<String> months,
+  ) {
+    return Column(
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            if (isCalendarMode)
+              IconButton(
+                icon: const Icon(Icons.chevron_left),
+                onPressed: () => _changeMonth(-1),
+              ),
+            _buildDropdown(
+              label: '${_focusedDay.year}',
+              options: years,
+              onSelected: (v) => setState(
+                () =>
+                    _focusedDay = DateTime(int.parse(v), _focusedDay.month, 1),
+              ),
+            ),
+            const Text(' / '),
+            _buildDropdown(
+              label: '${_focusedDay.month}',
+              options: months,
+              onSelected: (v) => setState(
+                () => _focusedDay = DateTime(_focusedDay.year, int.parse(v), 1),
+              ),
+            ),
+            if (isCalendarMode)
+              IconButton(
+                icon: const Icon(Icons.chevron_right),
+                onPressed: () => _changeMonth(1),
+              ),
+          ],
+        ),
+        if (isCalendarMode)
+          TextButton(
+            onPressed: () => setState(() {
+              _focusedDay = DateTime.now();
+              _selectedDay = DateTime.now();
+            }),
+            child: const Text(
+              'Today',
+              style: TextStyle(
+                color: Color(0xFF6A498C),
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  void _changeMonth(int delta) {
+    setState(
+      () => _focusedDay = DateTime(
+        _focusedDay.year,
+        _focusedDay.month + delta,
+        1,
+      ),
+    );
+  }
+
+  Widget _buildDropdown({
     required String label,
     required List<String> options,
     required Function(String) onSelected,
   }) {
     return PopupMenuButton<String>(
       onSelected: onSelected,
-      itemBuilder: (BuildContext context) {
-        return options.map((String choice) {
-          return PopupMenuItem<String>(value: choice, child: Text(choice));
-        }).toList();
-      },
+      itemBuilder: (ctx) =>
+          options.map((s) => PopupMenuItem(value: s, child: Text(s))).toList(),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
         decoration: BoxDecoration(
           border: Border.all(color: Colors.black12),
           borderRadius: BorderRadius.circular(8),
         ),
-        child: Text(label, style: const TextStyle(fontWeight: FontWeight.bold)),
+        child: Text(
+          '$label ▼',
+          style: const TextStyle(fontWeight: FontWeight.bold),
+        ),
       ),
     );
   }
-  /*
-  //カレンダー縦スクロールオプション
-  Widget _buildVerticalCalendarList() {
-    return ListView.builder(
-      key: const ValueKey('VerticalList'),
-      controller: _scrollController,
-      itemCount: 36,
-      itemBuilder: (context, index) {
-        final month = DateTime(
-          DateTime.now().year,
-          DateTime.now().month - 12 + index,
-        );
 
-        return Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
-              child: TableCalendar(
-                firstDay: DateTime.utc(2000, 1, 1),
-                lastDay: DateTime.utc(2030, 12, 31),
-                focusedDay: month,
-                calendarFormat: CalendarFormat.month,
-                headerVisible: false,
-                daysOfWeekVisible: false,
-                sixWeekMonthsEnforced: false, // 高さを一定にするため true がおすすめ
-                rowHeight: 52,
-                availableGestures: AvailableGestures.none,
-                selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
-                onDaySelected: (selected, focused) {
-                  if (isSameDay(_selectedDay, selected)) {
-                    setState(() => _isDetailView = true);
-                  } else {
-                    setState(() {
-                      _selectedDay = selected;
-                      _focusedDay = focused;
-                    });
-                  }
-                },
-                calendarBuilders: _buildCalendarBuilders(),
-                calendarStyle: _buildCalendarStyle(),
-              ),
-            ),
-            const SizedBox(height: 24),
-          ],
-        );
-      },
-    );
-  }*/
-
-  /*/固定される曜日ヘッダー
-  Widget _buildDaysOfWeekHeader() {
-    final days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        border: Border(bottom: BorderSide(color: Colors.black12, width: 0.5)),
-      ),
-      child: Row(
-        children: days.map((day) {
-          return Expanded(
-            child: Center(
-              child: Text(
-                day,
-                style: TextStyle(
-                  // 日曜は赤、土曜は青、平日はグレーにするなど
-                  color: day == 'Sun'
-                      ? Colors.red
-                      : (day == 'Sat' ? Colors.blue : Colors.black54),
-                  fontWeight: FontWeight.bold,
-                  fontSize: 12,
-                ),
-              ),
-            ),
-          );
-        }).toList(),
-      ),
-    );
-  }*/
+  /////////////////////
 
   // --- カレンダーの装飾 ---
   CalendarBuilders _buildCalendarBuilders() {
     return CalendarBuilders(
       markerBuilder: (context, date, events) {
-        final emoji = _diaryEntries[DateTime(date.year, date.month, date.day)];
-        if (emoji != null) {
-          if (widget.showDates) {
-            return Center(
-              child: Padding(
-                padding: const EdgeInsets.only(top: 20),
-                child: Text(
-                  emoji,
-                  style: const TextStyle(fontSize: 28), // 縦幅を広げたので少し大きくしてもOK
-                ),
-              ),
-            );
-          } else {
-            return Center(
-              child: Text(
-                emoji,
-                style: const TextStyle(fontSize: 30), // ★ サイズを思い切って大きく（例：36）
-              ),
-            );
-          }
-        }
-        return null;
+        final emoji = _diaryEntries[date.dateOnly];
+        if (emoji == null) return null;
+        return Center(
+          child: Text(
+            emoji,
+            style: TextStyle(fontSize: widget.showDates ? 28 : 36),
+          ), // 縦幅を広げたので少し大きくしてもOK
+        );
       },
     );
   }
 
   //メインのカレンダー表示
   CalendarStyle _buildCalendarStyle() {
-    //今月の日付の色制御
-    final dateTextStyle = TextStyle(
-      color: widget.showDates ? Colors.black : Colors.transparent, // オフの時は透明に
-    );
-    //前後の月の日付制御
-    final outDateTextStyle = TextStyle(
-      // ONの時は薄いグレー(black26)、OFFの時は透明に
-      color: widget.showDates ? Colors.black26 : Colors.transparent,
-    );
+    final color = widget.showDates ? Colors.black : Colors.transparent;
     return CalendarStyle(
       cellAlignment: Alignment.topCenter,
-      cellPadding: const EdgeInsets.only(top: 2),
-
-      defaultTextStyle: dateTextStyle,
+      defaultTextStyle: TextStyle(color: color),
       weekendTextStyle: TextStyle(
         color: widget.showDates ? Colors.red : Colors.transparent,
       ),
-      todayTextStyle: TextStyle(
-        color: widget.showDates ? Colors.black : Colors.transparent,
-        fontWeight: FontWeight.bold,
+      outsideTextStyle: TextStyle(
+        color: widget.showDates ? Colors.black26 : Colors.transparent,
       ),
-      selectedTextStyle: TextStyle(
-        color: widget.showDates ? Colors.black : Colors.transparent,
-        fontWeight: FontWeight.bold,
-      ),
-
-      outsideTextStyle: outDateTextStyle, //前後の月の日付も非表示できるように
-
       todayDecoration: BoxDecoration(
         color: Colors.cyan.withValues(alpha: 0.3),
-        shape: BoxShape.rectangle,
         borderRadius: BorderRadius.circular(4),
       ),
       selectedDecoration: BoxDecoration(
         color: Colors.black12,
-        shape: BoxShape.rectangle,
         borderRadius: BorderRadius.circular(4),
       ),
-      weekendDecoration: const BoxDecoration(shape: BoxShape.rectangle),
-      holidayDecoration: const BoxDecoration(shape: BoxShape.rectangle),
-      defaultDecoration: const BoxDecoration(shape: BoxShape.rectangle),
-      outsideDecoration: const BoxDecoration(shape: BoxShape.rectangle),
-      cellMargin: const EdgeInsets.all(2),
     );
   }
 
   // --- デイリー詳細のボディ ---
   Widget _buildDailyViewBody() {
-    final emoji =
-        _diaryEntries[DateTime(
-          _selectedDay!.year,
-          _selectedDay!.month,
-          _selectedDay!.day,
-        )];
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final selectedDate = DateTime(
-      _selectedDay!.year,
-      _selectedDay!.month,
-      _selectedDay!.day,
-    );
-    final bool isToday = isSameDay(_selectedDay, now);
-    final bool isPast = selectedDate.isBefore(today);
+    final emoji = _diaryEntries[_selectedDay!.dateOnly];
+    final isToday = isSameDay(_selectedDay, DateTime.now());
+    final isPast = _selectedDay!.isBefore(DateTime.now().dateOnly);
 
     return Center(
       child: Column(
@@ -539,89 +352,26 @@ class CalScreenState extends State<CalScreen> {
     );
   }
 
-  void _moveDay(int days) {
-    setState(() {
-      _selectedDay = _selectedDay!.add(Duration(days: days));
-      _focusedDay = _selectedDay!;
-    });
-  }
-
-  void _addEmoji(String emoji) {
-    setState(() {
-      final key = DateTime(
-        _selectedDay!.year,
-        _selectedDay!.month,
-        _selectedDay!.day,
-      );
-      _diaryEntries[key] = emoji;
-    });
-  }
-
-  // --- 絵文字選択シートを表示する関数 ---
   void _showEmojiPicker() {
-    double emojiSize = 28;
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      builder: (BuildContext context) {
-        return Container(
-          height: MediaQuery.of(context).size.height * 0.4,
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => SizedBox(
+        height: MediaQuery.of(context).size.height * 0.4,
+        child: EmojiPicker(
+          onEmojiSelected: (cat, emoji) {
+            _addEmoji(emoji.emoji);
+            Navigator.pop(context);
+          },
+          config: const Config(
+            emojiViewConfig: EmojiViewConfig(columns: 7, emojiSizeMax: 28),
           ),
-          child: SafeArea(
-            bottom: true,
-            child: Column(
-              children: [
-                const SizedBox(height: 10),
-                Container(
-                  width: 40,
-                  height: 5,
-                  decoration: BoxDecoration(
-                    color: const Color.fromARGB(31, 255, 255, 255),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                ),
-                Expanded(
-                  child: EmojiPicker(
-                    onEmojiSelected: (category, emoji) {
-                      _addEmoji(emoji.emoji);
-                      Navigator.pop(context);
-                    },
-                    config: Config(
-                      emojiViewConfig: EmojiViewConfig(
-                        columns: 7,
-                        emojiSizeMax: emojiSize,
-                      ),
-                      checkPlatformCompatibility: true,
-                      // 操作バー（青い部分）の見た目を調整したい場合はここ
-                      bottomActionBarConfig: const BottomActionBarConfig(
-                        backgroundColor: Colors.white, // 背景を白くしてスッキリさせることも可能
-                        buttonColor: Colors.transparent,
-                        buttonIconColor: Colors.black45,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
+        ),
+      ),
     );
-  }
-
-  void _onDaySelected(DateTime selectedDay, DateTime focusedDay) {
-    setState(() {
-      // 1. すでに選択されている日を再度タップしたなら詳細画面へ
-      if (isSameDay(_selectedDay, selectedDay)) {
-        _isDetailView = true;
-      } else {
-        // 2. 違う日をタップしたなら、その日を選択状態にする
-        _selectedDay = selectedDay;
-        _focusedDay = focusedDay;
-      }
-    });
   }
 }

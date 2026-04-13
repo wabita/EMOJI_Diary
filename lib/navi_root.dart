@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 
+import 'screens/arc_screen.dart';
 import 'screens/cal_screen.dart';
+
+enum AppTab { cal, arc, timeline, profile }
 
 class NaviRoot extends StatefulWidget {
   const NaviRoot({super.key});
@@ -10,107 +13,83 @@ class NaviRoot extends StatefulWidget {
 
 class _NaviRootState extends State<NaviRoot> {
   final GlobalKey<CalScreenState> _calKey = GlobalKey();
-  int _currentIndex = 0;
+  AppTab _currentTab = AppTab.cal;
   bool _showDates = true;
 
-  @override
-  Widget build(BuildContext context) {
-    final List<Widget> pages = [
+  final Map<DateTime, String> _dummyData = {
+    DateTime(2025, 9, 1): '🎂',
+    // ...
+  };
+
+  List<Widget> _buildPages() {
+    return [
       CalScreen(key: _calKey, showDates: _showDates),
-      const Center(child: Text('アーカイブ')),
+      ArcScreen(diaryEntries: _dummyData),
       const Center(child: Text('タイムライン')),
       const Center(child: Text('プロフィール')),
     ];
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Emoji Diary'),
         centerTitle: true,
         elevation: 0,
         actions: [
-          if (_currentIndex == 0) // カレンダー画面の時だけ表示
-            Padding(
-              padding: const EdgeInsets.only(right: 8.0),
-              child: IconButton(
-                onPressed: () => setState(() => _showDates = !_showDates),
-                icon: Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    Icon(
-                      _showDates ? Icons.block : Icons.radio_button_unchecked,
-                      color: _showDates ? Colors.red : Colors.green,
-                      size: 28,
-                    ),
-                    const Text(
-                      '1',
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+          if (_currentTab == AppTab.cal)
+            IconButton(
+              onPressed: () => setState(() => _showDates = !_showDates),
+              icon: Icon(_showDates ? Icons.visibility : Icons.visibility_off),
             ),
         ],
       ),
-      body: pages[_currentIndex],
+      body: IndexedStack(index: _currentTab.index, children: _buildPages()),
+
       // 真ん中の投稿ボタン
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          // もし他のタブにいたら、カレンダータブに切り替え
-          setState(() {
-            _currentIndex = 0;
-          });
+      floatingActionButton: SizedBox(
+        width: 80,
+        height: 80,
+        child: FloatingActionButton(
+          shape: const CircleBorder(),
 
-          // CalScreenの関数を実行する
-          // currentState が null でないことを確認して呼び出し
-          Future.microtask(() {
-            _calKey.currentState?.triggerTodayAction();
-          });
-        },
-        child: const Icon(Icons.add_reaction),
+          onPressed: () {
+            setState(() => _currentTab = AppTab.cal);
+            Future.microtask(() {
+              _calKey.currentState?.triggerTodayAction();
+            });
+          },
+          child: const Icon(Icons.add_reaction, size: 34),
+        ),
       ),
 
+      // 下部のナビゲーションバー
       bottomNavigationBar: BottomAppBar(
         shape: const CircularNotchedRectangle(),
         notchMargin: 8.0,
+        height: 50.0,
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: [
-            IconButton(
-              icon: Icon(
-                Icons.calendar_month,
-                color: _currentIndex == 0 ? Colors.cyan : Colors.grey,
-              ),
-              onPressed: () => setState(() => _currentIndex = 0),
-            ),
-            IconButton(
-              icon: Icon(
-                Icons.view_headline,
-                color: _currentIndex == 1 ? Colors.cyan : Colors.grey,
-              ),
-              onPressed: () => setState(() => _currentIndex = 1),
-            ),
-            const SizedBox(width: 40), // ボタン用の隙間
-            IconButton(
-              icon: Icon(
-                Icons.group,
-                color: _currentIndex == 2 ? Colors.cyan : Colors.grey,
-              ),
-              onPressed: () => setState(() => _currentIndex = 2),
-            ),
-            IconButton(
-              icon: Icon(
-                Icons.person,
-                color: _currentIndex == 3 ? Colors.cyan : Colors.grey,
-              ),
-              onPressed: () => setState(() => _currentIndex = 3),
-            ),
+            _buildTabButton(AppTab.cal, Icons.calendar_month),
+            _buildTabButton(AppTab.arc, Icons.view_headline),
+            const SizedBox(width: 48), // FAB用のスペース
+            _buildTabButton(AppTab.timeline, Icons.group),
+            _buildTabButton(AppTab.profile, Icons.person),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildTabButton(AppTab tab, IconData icon) {
+    final isSelected = _currentTab == tab;
+    return IconButton(
+      iconSize: 30,
+      icon: Icon(icon, color: isSelected ? Colors.cyan : Colors.grey),
+      onPressed: () => setState(() => _currentTab = tab),
     );
   }
 }
