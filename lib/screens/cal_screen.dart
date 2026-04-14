@@ -1,5 +1,8 @@
+import 'dart:convert';
+
 import 'package:emoji_picker_flutter/emoji_picker_flutter.dart';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:table_calendar/table_calendar.dart';
 
 // DateTimeの利便性を上げるための拡張
@@ -26,21 +29,52 @@ class CalScreenState extends State<CalScreen> {
   DateTime? _selectedDay = DateTime.now();
 
   // 日記データ
-  final Map<DateTime, String> _diaryEntries = {
-    DateTime(2025, 9, 1): '🎂',
-    DateTime(2025, 9, 2): '💻',
-    DateTime(2025, 9, 15): '🥺',
-  };
+  Map<DateTime, String> _diaryEntries = {};
 
   @override
   void initState() {
     super.initState();
+    _loadDiaryData();
     if (widget.autoOpenPicker) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         setState(() => _isDetailView = true); // 詳細画面に切り替え
         _showEmojiPicker(); // ピッカー表示
       });
     }
+  }
+
+  // --- データの読み込み ---
+  Future<void> _loadDiaryData() async {
+    final prefs = await SharedPreferences.getInstance();
+    final String? jsonString = prefs.getString('diary_data');
+
+    if (jsonString != null) {
+      final Map<String, dynamic> decodedData = json.decode(jsonString);
+      setState(() {
+        // StringをDateTimeに戻してMapを再構築
+        _diaryEntries = decodedData.map(
+          (key, value) => MapEntry(DateTime.parse(key), value.toString()),
+        );
+      });
+    }
+  }
+
+  // --- データの保存 ---
+  Future<void> _saveDiaryData() async {
+    final prefs = await SharedPreferences.getInstance();
+    // DateTimeをStringに変換してJSONにする
+    final Map<String, String> dataToSave = _diaryEntries.map(
+      (key, value) => MapEntry(key.toIso8601String(), value),
+    );
+    await prefs.setString('diary_data', json.encode(dataToSave));
+  }
+
+  // 絵文字を追加したときに保存を呼ぶように変更
+  void _addEmoji(String emoji) {
+    setState(() {
+      _diaryEntries[_selectedDay!.dateOnly] = emoji;
+    });
+    _saveDiaryData(); // ★ 追加した瞬間に保存！
   }
 
   // NaviRoot呼び出し
@@ -69,15 +103,8 @@ class CalScreenState extends State<CalScreen> {
     });
   }
 
-  void _addEmoji(String emoji) {
-    setState(() {
-      _diaryEntries[_selectedDay!.dateOnly] = emoji;
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
-    // 理由：外側の NaviRoot がすでにそれらを用意してくれているから
     return Column(
       children: [
         _buildHeader(),
@@ -272,23 +299,37 @@ class CalScreenState extends State<CalScreen> {
   //メインのカレンダー表示
   CalendarStyle _buildCalendarStyle() {
     final color = widget.showDates ? Colors.black : Colors.transparent;
+    const commonShape = BoxShape.rectangle;
+    final commonBorderRadius = BorderRadius.circular(4);
+
     return CalendarStyle(
       cellAlignment: Alignment.topCenter,
       defaultTextStyle: TextStyle(color: color),
+      todayTextStyle: TextStyle(color: color, fontWeight: FontWeight.bold),
+
+      selectedTextStyle: TextStyle(color: color, fontWeight: FontWeight.bold),
       weekendTextStyle: TextStyle(
         color: widget.showDates ? Colors.red : Colors.transparent,
       ),
       outsideTextStyle: TextStyle(
         color: widget.showDates ? Colors.black26 : Colors.transparent,
       ),
+
       todayDecoration: BoxDecoration(
         color: Colors.cyan.withValues(alpha: 0.3),
-        borderRadius: BorderRadius.circular(4),
+        shape: commonShape,
+        borderRadius: commonBorderRadius,
       ),
       selectedDecoration: BoxDecoration(
         color: Colors.black12,
-        borderRadius: BorderRadius.circular(4),
+        shape: commonShape,
+        borderRadius: commonBorderRadius,
       ),
+      defaultDecoration: const BoxDecoration(
+        shape: commonShape, // これを忘れるとエラーが出ることがある
+      ),
+      weekendDecoration: const BoxDecoration(shape: commonShape),
+      outsideDecoration: const BoxDecoration(shape: commonShape),
     );
   }
 
@@ -353,25 +394,56 @@ class CalScreenState extends State<CalScreen> {
   }
 
   void _showEmojiPicker() {
+    double emojiSize = 28;
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) => SizedBox(
-        height: MediaQuery.of(context).size.height * 0.4,
-        child: EmojiPicker(
-          onEmojiSelected: (cat, emoji) {
-            _addEmoji(emoji.emoji);
-            Navigator.pop(context);
-          },
-          config: const Config(
-            emojiViewConfig: EmojiViewConfig(columns: 7, emojiSizeMax: 28),
+      builder: (BuildContext context) {
+        return Container(
+          height: MediaQuery.of(context).size.height * 0.4,
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
           ),
-        ),
-      ),
+          child: SafeArea(
+            bottom: true,
+            child: Column(
+              children: [
+                const SizedBox(height: 10),
+                Container(
+                  width: 40,
+                  height: 5,
+                  decoration: BoxDecoration(
+                    color: const Color.fromARGB(31, 255, 255, 255),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+                Expanded(
+                  child: EmojiPicker(
+                    onEmojiSelected: (category, emoji) {
+                      _addEmoji(emoji.emoji);
+                      Navigator.pop(context);
+                    },
+                    config: Config(
+                      emojiViewConfig: EmojiViewConfig(
+                        columns: 7,
+                        emojiSizeMax: emojiSize,
+                      ),
+                      checkPlatformCompatibility: true,
+                      // 操作バー（青い部分）の見た目を調整したい場合はここ
+                      bottomActionBarConfig: const BottomActionBarConfig(
+                        backgroundColor: Colors.white, // 背景を白くしてスッキリさせることも可能
+                        buttonColor: Colors.transparent,
+                        buttonIconColor: Colors.black45,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }
